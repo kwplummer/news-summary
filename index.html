@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>News Digest</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg-deep: #0f0018;
+    --bg-mid: #1a0025;
+    --bg-card: #22003080;
+    --bg-card-hover: #2e004090;
+    --accent: #c840ff;
+    --accent-dim: #8a20b8;
+    --accent-glow: #d060ff40;
+    --text-primary: #e8daf0;
+    --text-secondary: #a080b8;
+    --text-muted: #705888;
+    --border: #3a1850;
+    --tag-bg: #2a103a;
+  }
+
+  html { height: 100%; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 0%, #3a007020 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, #20003820 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), #f080ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: .25rem;
+  }
+
+  .header .date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .85rem;
+    color: var(--text-muted);
+  }
+
+  .header .stats {
+    display: flex;
+    gap: 1.5rem;
+    margin-top: .75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    color: var(--text-secondary);
+  }
+
+  .header .stats span {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── Digest Text ── */
+  .digest-text {
+    margin-bottom: 3rem;
+  }
+
+  .digest-text h2 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-top: 2rem;
+    margin-bottom: .5rem;
+    letter-spacing: .02em;
+  }
+
+  .digest-text p {
+    color: var(--text-primary);
+    font-size: .95rem;
+    margin: .5rem 0;
+    opacity: .92;
+  }
+
+  /* ── Clusters ── */
+  .clusters-header {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+
+  .clusters-header::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.2em;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .cluster {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    transition: background .3s ease, border-color .3s ease;
+    backdrop-filter: blur(8px);
+  }
+
+  .cluster:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-dim);
+  }
+
+  .cluster-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--text-muted);
+    margin-bottom: .5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.2rem;
+  }
+
+  .cluster-meta .label {
+    color: var(--accent-dim);
+  }
+
+  .cluster-summary {
+    font-size: .95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: .75rem;
+    line-height: 1.55;
+  }
+
+  .cluster-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-bottom: .75rem;
+  }
+
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .68rem;
+    background: var(--tag-bg);
+    color: var(--accent);
+    padding: .2rem .55rem;
+    border-radius: 4px;
+    border: 1px solid #3a185060;
+  }
+
+  .cluster-sources {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem;
+    color: var(--text-muted);
+    margin-bottom: .5rem;
+  }
+
+  .cluster-sources span {
+    color: var(--text-secondary);
+  }
+
+  .cluster-toggle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .78rem;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    padding: .35rem .8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+
+  .cluster-toggle:hover {
+    background: var(--accent);
+    color: var(--bg-deep);
+    border-color: var(--accent);
+  }
+
+  .cluster-reps {
+    margin-top: .75rem;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height .4s ease, opacity .3s ease;
+  }
+
+  .cluster-reps.open {
+    max-height: 5000px;
+    opacity: 1;
+  }
+
+  .rep-item {
+    font-size: .82rem;
+    color: var(--text-secondary);
+    padding: .65rem 0;
+    border-top: 1px solid #2a103a;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .rep-item img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin-top: .4rem;
+  }
+
+  .rep-item a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .rep-item a:hover {
+    text-decoration: underline;
+  }
+
+  .rep-item table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  /* ── Loading ── */
+  .loading {
+    text-align: center;
+    padding: 4rem 0;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .9rem;
+  }
+
+  .loading .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: .75rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error {
+    text-align: center;
+    padding: 3rem;
+    color: #ff6080;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .85rem;
+    background: #40001520;
+    border: 1px solid #40001540;
+    border-radius: 12px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .container { padding: 1.25rem 1rem 3rem; }
+    .header h1 { font-size: 1.4rem; }
+    .header .stats { flex-direction: column; gap: .3rem; }
+    .cluster { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div id="root">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div>Loading digest…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function() {
+  const root = document.getElementById('root');
+
+  try {
+    const resp = await fetch('./digest.json');
+    if (!resp.ok) throw new Error(`Failed to load digest.json (${resp.status})`);
+    const data = await resp.json();
+    root.innerHTML = '';
+    render(root, data);
+  } catch (err) {
+    root.innerHTML = `<div class="error">⚠ ${err.message}<br><br>Make sure <code>digest.json</code> is in the same directory as this page.</div>`;
+  }
+
+  function render(container, data) {
+    // ── Header ──
+    const header = el('div', 'header');
+    header.appendChild(elText('h1', 'News Digest'));
+    header.appendChild(elText('div', new Date(data.digest_date * 1000).toLocaleString(), 'date'));
+
+    const stats = el('div', 'stats');
+    stats.innerHTML = `
+      <div>Items: <span>${data.total_items}</span></div>
+      <div>Noise: <span>${data.noise_count}</span></div>
+      <div>Clusters: <span>${data.clusters.length}</span></div>
+      <div>Time: <span>${data.elapsed_seconds.toFixed(1)}s</span></div>
+    `;
+    header.appendChild(stats);
+    container.appendChild(header);
+
+    // ── Digest Text ──
+    const digestDiv = el('div', 'digest-text');
+    const sections = data.digest_text.split('\n\n');
+    sections.forEach(section => {
+      if (section.startsWith('## ')) {
+        const h2 = document.createElement('h2');
+        h2.textContent = section.replace('## ', '').split('\n')[0];
+        digestDiv.appendChild(h2);
+
+        // Any continuation lines after the heading
+        const rest = section.replace('## ', '').split('\n').slice(1).join('\n').trim();
+        if (rest) {
+          const p = document.createElement('p');
+          p.textContent = rest;
+          digestDiv.appendChild(p);
+        }
+      } else if (section.trim()) {
+        const p = document.createElement('p');
+        p.textContent = section.replace(/\n/g, ' ');
+        digestDiv.appendChild(p);
+      }
+    });
+    container.appendChild(digestDiv);
+
+    // ── Clusters ──
+    container.appendChild(elText('div', 'Topic Clusters', 'clusters-header'));
+
+    data.clusters
+      .sort((a, b) => b.size - a.size)
+      .forEach(cluster => {
+        const card = el('div', 'cluster');
+
+        // Meta
+        const meta = el('div', 'cluster-meta');
+        meta.innerHTML = `
+          <div>Cluster <span class="label">#${cluster.label}</span></div>
+          <div>Size: ${cluster.size}</div>
+          <div>Rank: ${cluster.avg_rank.toFixed(2)}</div>
+          <div>Novelty: ${cluster.avg_novelty.toFixed(2)}</div>
+          <div>Density: ${cluster.avg_density.toFixed(2)}</div>
+        `;
+        card.appendChild(meta);
+
+        // Sources
+        if (cluster.top_sources && cluster.top_sources.length) {
+          const src = el('div', 'cluster-sources');
+          src.innerHTML = 'Sources: <span>' + cluster.top_sources.join(', ') + '</span>';
+          card.appendChild(src);
+        }
+
+        // Summary
+        const summary = el('div', 'cluster-summary');
+        summary.textContent = cluster.summary.trim();
+        card.appendChild(summary);
+
+        // Tags
+        if (cluster.top_tags && cluster.top_tags.length) {
+          const tagsDiv = el('div', 'cluster-tags');
+          cluster.top_tags.forEach(t => {
+            const tag = el('span', 'tag');
+            tag.textContent = t;
+            tagsDiv.appendChild(tag);
+          });
+          card.appendChild(tagsDiv);
+        }
+
+        // Toggle + representative posts
+        if (cluster.representative_texts && cluster.representative_texts.length) {
+          const toggle = document.createElement('button');
+          toggle.className = 'cluster-toggle';
+          toggle.textContent = `Show posts (${cluster.representative_texts.length})`;
+          card.appendChild(toggle);
+
+          const repsDiv = el('div', 'cluster-reps');
+          cluster.representative_texts.forEach(text => {
+            const item = el('div', 'rep-item');
+            item.innerHTML = text;
+            repsDiv.appendChild(item);
+          });
+          card.appendChild(repsDiv);
+
+          toggle.addEventListener('click', () => {
+            const isOpen = repsDiv.classList.toggle('open');
+            toggle.textContent = isOpen
+              ? `Hide posts (${cluster.representative_texts.length})`
+              : `Show posts (${cluster.representative_texts.length})`;
+          });
+        }
+
+        container.appendChild(card);
+      });
+  }
+
+  function el(tag, className) {
+    const e = document.createElement(tag);
+    if (className) e.className = className;
+    return e;
+  }
+
+  function elText(tag, text, className) {
+    const e = el(tag, className);
+    e.textContent = text;
+    return e;
+  }
+})();
+</script>
+
+</body>
+</html>
