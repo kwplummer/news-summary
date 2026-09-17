@@ -328,11 +328,25 @@
     root.innerHTML = `<div class="error">⚠ ${err.message}<br><br>Make sure <code>digest.json</code> is in the same directory as this page.</div>`;
   }
 
+  // Resolve the digest generation time from the canonical `args` field.
+  function getDigestDate(data) {
+    const args = (data && data.args) || {};
+    if (args.start) return new Date(args.start * 1000);
+    if (args.date) {
+      // Normalize "YYYY-MM-DD HH:MM:SS(.ffffff)" to an ISO-8601 string.
+      const iso = String(args.date).replace(' ', 'T');
+      const d = new Date(iso);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date(NaN);
+  }
+
   function render(container, data) {
     // ── Header ──
     const header = el('div', 'header');
     header.appendChild(elText('h1', 'News Digest'));
-    header.appendChild(elText('div', new Date(data.digest_date * 1000).toLocaleString(), 'date'));
+    const genDate = getDigestDate(data);
+    header.appendChild(elText('div', isNaN(genDate.getTime()) ? '' : genDate.toLocaleString(), 'date'));
 
     const stats = el('div', 'stats');
     stats.innerHTML = `
