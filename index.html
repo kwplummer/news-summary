@@ -149,6 +149,27 @@
     opacity: .92;
   }
 
+  .digest-text ul {
+    margin: .5rem 0;
+    padding-left: 1.25rem;
+  }
+
+  .digest-text li {
+    color: var(--text-primary);
+    font-size: .95rem;
+    margin: .3rem 0;
+    opacity: .92;
+  }
+
+  .digest-text li::marker {
+    color: var(--accent);
+  }
+
+  .digest-text strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
   /* ── Clusters ── */
   .clusters-header {
     font-size: 1.3rem;
@@ -490,18 +511,13 @@
         const h2 = document.createElement('h2');
         h2.textContent = section.replace('## ', '').split('\n')[0];
         digestDiv.appendChild(h2);
-
         // Any continuation lines after the heading
-        const rest = section.replace('## ', '').split('\n').slice(1).join('\n').trim();
-        if (rest) {
-          const p = document.createElement('p');
-          p.textContent = rest;
-          digestDiv.appendChild(p);
-        }
-      } else if (section.trim()) {
-        const p = document.createElement('p');
-        p.textContent = section.replace(/\n/g, ' ');
-        digestDiv.appendChild(p);
+        appendBlocks(digestDiv, section.replace('## ', '').split('\n').slice(1));
+      } else {
+        // Note: sections are split on blank lines, but the model uses single
+        // newlines within a block (e.g. Quick Hits bullet lines), so this
+        // must be line-aware too.
+        appendBlocks(digestDiv, section.split('\n'));
       }
     });
     panel.appendChild(digestDiv);
@@ -576,6 +592,47 @@
   }
 
   selectTab(activeTab);
+
+  // Minimal markdown for the digest text: "* item" / "- item" bullet lines
+  // become <ul>/<li>, **bold** and *italic* are inlined. Content is
+  // HTML-escaped first, so model output can't inject markup.
+  function inline(text) {
+    let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+    return s;
+  }
+
+  function appendBlocks(parent, lines) {
+    let list = null;
+    let para = [];
+    const flushPara = () => {
+      if (!para.length) return;
+      const p = document.createElement('p');
+      p.innerHTML = inline(para.join(' '));
+      parent.appendChild(p);
+      para = [];
+    };
+    for (const raw of lines) {
+      const line = raw.trim();
+      const m = line.match(/^[*\-] +(.*)$/);
+      if (m) {
+        flushPara();
+        if (!list) {
+          list = document.createElement('ul');
+          parent.appendChild(list);
+        }
+        const li = document.createElement('li');
+        li.innerHTML = inline(m[1]);
+        list.appendChild(li);
+      } else if (line) {
+        para.push(line);
+      } else {
+        flushPara();
+      }
+    }
+    flushPara();
+  }
 
   function el(tag, className) {
     const e = document.createElement(tag);
