@@ -78,6 +78,10 @@
     color: var(--text-muted);
   }
 
+  .header .date .note {
+    color: #8a6070;
+  }
+
   .header .stats {
     display: flex;
     gap: 1.5rem;
@@ -90,6 +94,38 @@
   .header .stats span {
     color: var(--accent);
     font-weight: 600;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
+
+  .tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .8rem;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: .4rem 1.1rem;
+    cursor: pointer;
+    transition: color .2s ease, background .2s ease;
+  }
+
+  .tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-card);
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-color: var(--accent-dim);
+    background: var(--bg-mid);
+    box-shadow: inset 0 2px 0 var(--accent);
   }
 
   /* ── Digest Text ── */
@@ -259,7 +295,7 @@
     border-collapse: collapse;
   }
 
-  /* ── Loading ── */
+  /* ── Loading / empty / error ── */
   .loading {
     text-align: center;
     padding: 4rem 0;
@@ -281,6 +317,21 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .85rem;
+    background: #1a002520;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+  }
+
+  .empty-state a {
+    color: var(--accent);
   }
 
   .error {
@@ -309,7 +360,7 @@
   <div id="root">
     <div class="loading">
       <div class="spinner"></div>
-      <div>Loading digest…</div>
+      <div>Loading digests…</div>
     </div>
   </div>
 </div>
@@ -318,45 +369,118 @@
 (async function() {
   const root = document.getElementById('root');
 
-  try {
-    const resp = await fetch('./digest.json');
-    if (!resp.ok) throw new Error(`Failed to load digest.json (${resp.status})`);
-    const data = await resp.json();
-    root.innerHTML = '';
-    render(root, data);
-  } catch (err) {
-    root.innerHTML = `<div class="error">⚠ ${err.message}<br><br>Make sure <code>digest.json</code> is in the same directory as this page.</div>`;
+  const TABS = [
+    { id: 'hourly', label: 'Hourly', file: 'hourly.json' },
+    { id: 'daily', label: 'Daily', file: 'daily.json' },
+  ];
+
+  const dataByTab = {};
+  const loadError = {};
+
+  // Load both digests up front (they're small) so tab switching is instant.
+  await Promise.all(TABS.map(async (t) => {
+    try {
+      const resp = await fetch(`./${t.file}`);
+      if (!resp.ok) throw new Error(`${t.file} not available (${resp.status})`);
+      dataByTab[t.id] = await resp.json();
+    } catch (err) {
+      loadError[t.id] = err;
+    }
+  }));
+
+  if (TABS.every((t) => loadError[t.id])) {
+    root.innerHTML = `<div class="error">⚠ ${loadError.hourly.message}<br><br>Make sure <code>hourly.json</code> / <code>daily.json</code> are in the same directory as this page.</div>`;
+    return;
+  }
+
+  // Default to the tab with the most recent digest.
+  let activeTab = 'hourly';
+  let best = NaN;
+  for (const t of TABS) {
+    if (!dataByTab[t.id]) continue;
+    const ts = getDigestDate(dataByTab[t.id]).date.getTime();
+    if (ts > best) { best = ts; activeTab = t.id; }
+  }
+
+  // ── Header + tabs (persistent) ──
+  const header = el('div', 'header');
+  header.appendChild(elText('h1', 'News Digest'));
+  const tabs = el('div', 'tabs');
+  const tabButtons = {};
+  for (const t of TABS) {
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.textContent = t.label;
+    btn.addEventListener('click', () => selectTab(t.id));
+    tabs.appendChild(btn);
+    tabButtons[t.id] = btn;
+  }
+  header.appendChild(tabs);
+  root.innerHTML = '';
+  root.appendChild(header);
+
+  const dateLine = el('div', 'date');
+  const stats = el('div', 'stats');
+  const panel = el('div');
+  header.appendChild(dateLine);
+  header.appendChild(stats);
+  root.appendChild(panel);
+
+  function selectTab(id) {
+    activeTab = id;
+    for (const t of TABS) {
+      tabButtons[t.id].classList.toggle('active', t.id === id);
+    }
+    render(id);
   }
 
   // Resolve the digest generation time from the canonical `args` field.
+  // Prefer `args.date` (UTC ISO-8601, e.g. "2026-09-17T03:00:00Z" — the
+  // browser converts to local time on display). Fall back to `args.start`
+  // for legacy digests, which is the epoch of the window START, not the
+  // generation time (so it can be up to a day stale for daily digests).
   function getDigestDate(data) {
     const args = (data && data.args) || {};
-    if (args.start) return new Date(args.start * 1000);
     if (args.date) {
-      // Normalize "YYYY-MM-DD HH:MM:SS(.ffffff)" to an ISO-8601 string.
       const iso = String(args.date).replace(' ', 'T');
       const d = new Date(iso);
-      if (!isNaN(d.getTime())) return d;
+      if (!isNaN(d.getTime())) return { date: d, legacy: false };
     }
-    return new Date(NaN);
+    if (args.start) return { date: new Date(args.start * 1000), legacy: true };
+    return { date: new Date(NaN), legacy: false };
   }
 
-  function render(container, data) {
-    // ── Header ──
-    const header = el('div', 'header');
-    header.appendChild(elText('h1', 'News Digest'));
-    const genDate = getDigestDate(data);
-    header.appendChild(elText('div', isNaN(genDate.getTime()) ? '' : genDate.toLocaleString(), 'date'));
+  function render(id) {
+    const data = dataByTab[id];
+    panel.innerHTML = '';
 
-    const stats = el('div', 'stats');
+    if (!data) {
+      const empty = el('div', 'empty-state');
+      empty.innerHTML = `No ${id} digest yet — the server writes ${TABS.find(t => t.id === id).file} when the next ${id} digest runs.`;
+      panel.appendChild(empty);
+    }
+
+    const gen = getDigestDate(data);
+    if (isNaN(gen.date.getTime())) {
+      dateLine.textContent = '';
+    } else {
+      dateLine.textContent = gen.date.toLocaleString();
+      if (gen.legacy) {
+        dateLine.append(' (window start, legacy digest)');
+      }
+    }
+
+    if (!data) {
+      stats.innerHTML = '';
+      return;
+    }
+
     stats.innerHTML = `
       <div>Items: <span>${data.total_items}</span></div>
       <div>Noise: <span>${data.noise_count}</span></div>
       <div>Clusters: <span>${data.clusters.length}</span></div>
       <div>Time: <span>${data.elapsed_seconds.toFixed(1)}s</span></div>
     `;
-    header.appendChild(stats);
-    container.appendChild(header);
 
     // ── Digest Text ──
     const digestDiv = el('div', 'digest-text');
@@ -380,10 +504,10 @@
         digestDiv.appendChild(p);
       }
     });
-    container.appendChild(digestDiv);
+    panel.appendChild(digestDiv);
 
     // ── Clusters ──
-    container.appendChild(elText('div', 'Topic Clusters', 'clusters-header'));
+    panel.appendChild(elText('div', 'Topic Clusters', 'clusters-header'));
 
     data.clusters
       .sort((a, b) => b.size - a.size)
@@ -447,9 +571,11 @@
           });
         }
 
-        container.appendChild(card);
+        panel.appendChild(card);
       });
   }
+
+  selectTab(activeTab);
 
   function el(tag, className) {
     const e = document.createElement(tag);
