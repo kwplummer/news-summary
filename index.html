@@ -564,27 +564,36 @@
           card.appendChild(tagsDiv);
         }
 
-        // Toggle + representative posts
-        if (cluster.representative_texts && cluster.representative_texts.length) {
+        const addToggle = (label, texts) => {
           const toggle = document.createElement('button');
           toggle.className = 'cluster-toggle';
-          toggle.textContent = `Show posts (${cluster.representative_texts.length})`;
+          toggle.textContent = `Show ${label} (${texts.length})`;
           card.appendChild(toggle);
 
-          const repsDiv = el('div', 'cluster-reps');
-          cluster.representative_texts.forEach(text => {
+          const div = el('div', 'cluster-reps');
+          texts.forEach(text => {
             const item = el('div', 'rep-item');
             item.innerHTML = text;
-            repsDiv.appendChild(item);
+            div.appendChild(item);
           });
-          card.appendChild(repsDiv);
+          card.appendChild(div);
 
           toggle.addEventListener('click', () => {
-            const isOpen = repsDiv.classList.toggle('open');
+            const isOpen = div.classList.toggle('open');
             toggle.textContent = isOpen
-              ? `Hide posts (${cluster.representative_texts.length})`
-              : `Show posts (${cluster.representative_texts.length})`;
+              ? `Hide ${label} (${texts.length})`
+              : `Show ${label} (${texts.length})`;
           });
+        };
+
+        // Parent-chain context posts (older posts this cluster replies to)
+        if (cluster.context_texts && cluster.context_texts.length) {
+          addToggle('context posts', cluster.context_texts);
+        }
+
+        // Representative posts
+        if (cluster.representative_texts && cluster.representative_texts.length) {
+          addToggle('posts', cluster.representative_texts);
         }
 
         panel.appendChild(card);
